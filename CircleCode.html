@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Graph Animation</title>
+    <style>
+        canvas {
+            border: 2px solid black;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+</head>
+<body>
+
+<canvas id="graphCanvas" width="1600" height="1600"></canvas>
+<button id="startButton">Start Animation</button>
+
+<script>
+// Initialize canvas and context
+const canvas = document.getElementById("graphCanvas");
+const ctx = canvas.getContext("2d");
+const center = { x: canvas.width / 2, y: canvas.height / 2 };
+const radius = 450;
+let edgeMap = new Map();
+
+// Initialize gif.js
+const gif = new GIF({
+    workers: 2,
+    quality: 10,
+    workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js'
+});
+
+// Function to calculate distance
+function getDistance(x1, y1, x2, y2) {
+    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+}
+
+// Function to get color based on distance
+function getColorForDistance(distance) {
+    const hue = (distance % 360);
+    return `hsl(${hue}, 90%, 50%)`;
+}
+
+// Function to draw a node
+function drawNode(x, y, isNew) {
+    ctx.beginPath();
+    ctx.arc(x, y, 1.25, 0, Math.PI * 2);
+    ctx.fillStyle = isNew ? "red" : "blue";
+    ctx.fill();
+    ctx.closePath();
+}
+
+// Function to draw an edge
+function drawEdge(x1, y1, x2, y2) {
+    const distance = getDistance(x1, y1, x2, y2);
+    const color = getColorForDistance(distance);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    ctx.closePath();
+}
+
+// Function to draw the graph for a given n
+function drawGraph(n) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let angleIncrement = 2 * Math.PI / n;
+    let isNew = new Array(n).fill(true);
+
+    for(let i = 0; i < n; i++) {
+        let angle1 = i * angleIncrement;
+        let x1 = Math.round((center.x + radius * Math.cos(angle1)) * 1000) / 1000;
+        let y1 = Math.round((center.y + radius * Math.sin(angle1)) * 1000) / 1000;
+
+        for (let j = i + 1; j < n; j++) {
+            let angle2 = j * angleIncrement;
+            let x2 = Math.round((center.x + radius * Math.cos(angle2)) * 1000) / 1000;
+            let y2 = Math.round((center.y + radius * Math.sin(angle2)) * 1000) / 1000;
+            let edgeKey = `${x1},${y1}-${x2},${y2}`;
+            
+            if (!edgeMap.has(edgeKey)) {
+                edgeMap.set(edgeKey, true);
+                drawEdge(x1, y1, x2, y2);
+                isNew[i] = isNew[j] = true;
+            }
+        }
+
+        drawNode(x1, y1, isNew[i]);
+    }
+}
+
+// Function to start the animation and save as GIF
+function startAnimation() {
+    let n = 2;
+    let increasing = true;
+    const limit = 200;
+    let frameCount = 0;
+    const totalFrames = 1800; // 30 seconds at 60 FPS
+
+    const interval = setInterval(() => {
+        edgeMap.clear();
+        drawGraph(n);
+        gif.addFrame(canvas, {copy: true, delay: 16}); // Adjusted frame delay for 60 FPS
+
+        if (increasing) {
+            n++;
+            if (n > limit) {
+                increasing = false;
+            }
+        } else {
+            n--;
+            if (n <= 2) {
+                increasing = true;
+            }
+        }
+
+        frameCount++;
+        if (frameCount >= totalFrames) {
+            gif.render();
+            clearInterval(interval);
+        }
+    }, 16); // Adjusted interval for 60 FPS
+}
+
+// On GIF render completion, download the GIF
+gif.on('finished', function(blob) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'graph-animation.gif';
+    link.click();
+});
+
+document.getElementById('startButton').addEventListener('click', startAnimation);
+</script>
+</body>
+</html>
